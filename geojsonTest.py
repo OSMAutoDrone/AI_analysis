@@ -3,6 +3,7 @@ import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import box
+from shapely.geometry import Point
 
 base_path = r"C:/Users/ti-da/OneDrive/Documents/PMC/AI_analysis/data/"
 
@@ -23,6 +24,21 @@ if gdf.crs != raster_crs:
     gdf = gdf.to_crs(raster_crs)
 gdf = gdf[['osm_id', 'highway', 'name', 'geometry']]
 gdf_in = gpd.clip(gdf, raster_bbox)
+
+# Extraire tous les points (sommets) des géométries
+points = []
+
+for geom in gdf_in.geometry:
+    if geom.geom_type == "LineString":
+        points.extend([Point(xy) for xy in geom.coords])
+
+    elif geom.geom_type == "MultiLineString":
+        for line in geom.geoms:
+            points.extend([Point(xy) for xy in line.coords])
+
+# Créer un GeoDataFrame de points
+gdf_points = gpd.GeoDataFrame(geometry=points, crs=raster_crs)
+
 
 fig, ax = plt.subplots(figsize=(8, 8))
 
