@@ -95,7 +95,7 @@ class Trainer:
 
             # Calculate the iou
             iou_value = self.metric(outputs, targets)
-            running_ious.append(iou_value)
+            running_ious.append(iou_value.item())
 
             # Backward pass
             loss.backward()
@@ -127,7 +127,7 @@ class Trainer:
 
                 # Calculate the iou
                 iou_value = self.metric(outputs, targets)
-                running_ious.append(iou_value)
+                running_ious.append(iou_value.item())
 
         self.results["val_loss"].append(np.mean(running_losses))
         self.results["val_iou"].append(np.mean(running_ious))

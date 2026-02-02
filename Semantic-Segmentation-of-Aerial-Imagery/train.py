@@ -7,7 +7,7 @@ import splitfolders
 import numpy as np
 import torch.optim as optim
 import segmentation_models_pytorch as smp
-import utils,engine,data_setup,predictions
+import utils,engine,data_setup,predictions, predict
 
 from torch.optim import lr_scheduler
 
@@ -86,9 +86,12 @@ outputs = predictions.evaluate_model(model=model, dataloaders=dataloaders['val']
 ## Display the predictions
 images, masks = next(iter(dataloaders['test']))
 
-idx = 0
-original_image = np.transpose(images[idx])
-ground_truth_mask = np.transpose(np.argmax(masks[idx], axis=0, keepdims=True))
-res = predictions.predict_mask(img=images, model=model, device=device)
-predicted_mask = np.transpose(np.argmax(res[idx].to('cpu'), axis=0, keepdims=True))
-utils.display(original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)
+img_np, transform, crs = predict.load_geotiff("../data/testGeoImage02.tif")
+img_tensor = predict.preprocess(img_np)
+img_vis = img_np.transpose(1, 2, 0)
+for idx in range(len(images)):
+    original_image = np.transpose(images[idx])
+    ground_truth_mask = np.transpose(np.argmax(masks[idx], axis=0, keepdims=True))
+    res = predictions.predict_mask(img=images, model=model, device=device)
+    predicted_mask = np.transpose(np.argmax(res[idx].to('cpu'), axis=0, keepdims=True))
+    utils.display(original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)
