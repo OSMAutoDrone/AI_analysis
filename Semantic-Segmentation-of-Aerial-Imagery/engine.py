@@ -58,8 +58,9 @@ class Trainer:
             self.val_epoch()
             print(f'\nEpoch {self.epoch}: Train loss: {self.results["train_loss"][-1]} Train iou: {self.results["train_iou"][-1]} Val loss: {self.results["val_loss"][-1]} Val iou: {self.results["val_iou"][-1]}')
 
-            # Save checkpoints every epoch
-            utils.save_model(self.model, self.save_dir, self.epoch)
+            # Save checkpoints every 5 epoch
+            if self.epoch % 5 == 0:
+                utils.save_model(self.model, self.save_dir, self.epoch)
 
         time_elapsed = time.time() - start_time
         print('\n')
