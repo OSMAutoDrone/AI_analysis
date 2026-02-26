@@ -4,51 +4,55 @@ from rasterio.features import rasterize
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import box
-from shapely.geometry import Point
 from scipy.ndimage import binary_dilation
 from overpass_router import overpass_query
 import os
 
-def road_masking(gdf, mask):
-    if gdf.empty:
-        return mask
+def road_masking(input_gdf, input_mask):
+    output_mask = input_mask.copy()
+    gdf_road = input_gdf[(input_gdf['type'] == 'linestring') & (input_gdf['highway'].isin(highway_class_list))]
+    gdf_road = gdf_road.dropna(subset=['highway'])
+    if len(gdf_road) < 1:
+        return output_mask
     road_mask = rasterize(
-        [(geom, 1) for geom in gdf.geometry],
+        [(geom, 1) for geom in gdf_road.geometry],
         out_shape=(height, width),
         transform=transform,
         fill=0,
         dtype=np.uint8,
         all_touched=True
     )
+    unit_per_pixel = 0.5
     m_per_pixel = transform.a*unit_per_pixel
     road_mask = binary_dilation(
         road_mask,
         iterations=int(3.5/m_per_pixel)
     ).astype(np.uint8)
-    mask[road_mask == 1] = [240, 30, 44]
-    return mask
+    output_mask[road_mask == 1] = [240, 30, 44]
+    return output_mask
 
-def road_polygon_masking(gdf, mask):
-    gdf = gdf[(gdf['highway'].isin(highway_class_list)) | (gdf['amenity'] == 'parking')]
-    gdf = gdf_poly.clip(gdf, raster_bbox)
-    if gdf.empty:
-        return mask
+def road_polygon_masking(input_gdf, input_mask):
+    output_mask = input_mask.copy()
+    gdf_parking = input_gdf[input_gdf['type'] == 'polygon']
+    gdf_parking = gdf_parking[(gdf_parking['highway'].notna()) | (gdf_parking['amenity'] == 'parking')]
+    if len(gdf_parking) < 1:
+        return output_mask
     road_mask = rasterize(
-        [(geom, 1) for geom in gdf.geometry if geom is not None],
+        [(geom, 1) for geom in gdf_parking.geometry if geom is not None],
         out_shape=(height, width),
         transform=transform,
         fill=0,
         dtype=np.uint8,
         all_touched=True
     )
-    mask[road_mask == 1] = [240, 30, 44]
-    return mask
+    output_mask[road_mask == 1] = [240, 30, 44]
+    return output_mask
 
-def building_polygon_masking(gdf, mask):
-    gdf_building = gdf.dropna(subset=['building'])
-    gdf_building = gdf_building.clip(gdf_building, raster_bbox)
-    if gdf.empty:
-        return mask
+def building_polygon_masking(input_gdf, input_mask):
+    output_mask = input_mask.copy()
+    gdf_building = input_gdf.dropna(subset=['building'])
+    if len(gdf_building) < 1:
+        return output_mask
     building_mask = rasterize(
         [(geom, 1) for geom in gdf_building.geometry if geom is not None],
         out_shape=(height, width),
@@ -57,14 +61,14 @@ def building_polygon_masking(gdf, mask):
         dtype=np.uint8,
         all_touched=True
     )
-    mask[building_mask == 1] = [255, 255, 0]
-    return mask
+    output_mask[building_mask == 1] = [255, 255, 0]
+    return output_mask
 
-def water_polygon_masking(gdf, mask):
-    gdf_water = gdf[gdf['natural'] == 'water']
-    gdf_water = gdf_water.clip(gdf, raster_bbox)
-    if gdf.empty:
-        return mask
+def water_polygon_masking(input_gdf, input_mask):
+    output_mask = input_mask.copy()
+    gdf_water = input_gdf[input_gdf['natural'] == 'water']
+    if len(gdf_water) < 1:
+        return output_mask
     water_mask = rasterize(
         [(geom, 1) for geom in gdf_water.geometry if geom is not None],
         out_shape=(height, width),
@@ -73,15 +77,30 @@ def water_polygon_masking(gdf, mask):
         dtype=np.uint8,
         all_touched=True
     )
-    mask[water_mask == 1] = [0, 64, 255]
-    return mask
+    output_mask[water_mask == 1] = [0, 64, 255]
+    return output_mask
+
+def debug_plot(input_data, input_mask, input_bounds, title):
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(
+        input_data,
+        extent=(input_bounds.left, input_bounds.right, input_bounds.bottom, input_bounds.top)
+    )
+
+    ax.imshow(
+        input_mask,
+        alpha=0.5,
+        extent=(input_bounds.left, input_bounds.right, input_bounds.bottom, input_bounds.top)
+    )
+
+    ax.set_title(title)
+    ax.axis("off")
 
 if __name__ == "__main__":
     img_name = "testGeoImage02.tif"
     base_data_path = r"./data/"
     highway_data_map_path = "OSM-class-lists/highway.txt"
 
-    unit_per_pixel = 0.5
 
     with rasterio.open(os.path.join(base_data_path,img_name)) as img:
         bounds = img.bounds
@@ -98,7 +117,7 @@ if __name__ == "__main__":
     data = np.moveaxis(data, 0, -1)
 
 
-    gdf, gdf_poly = overpass_query(raster_crs, bounds)
+    gdf = overpass_query(raster_crs, bounds)
 
     with open(highway_data_map_path, 'r') as f:
         highway_class_list = f.read().splitlines()
@@ -106,29 +125,15 @@ if __name__ == "__main__":
     if gdf.crs != raster_crs or gdf.crs != raster_crs :
         print("WARNING- raster and img crs don't match")
         gdf = gdf.to_crs(raster_crs)
-        gdf_poly = gdf_poly.to_crs(raster_crs)
-    gdf = gdf[['osm_id', 'highway', 'name', 'geometry']]
-    gdf_poly = gdf_poly[['osm_id','amenity','natural', 'highway', 'building', 'geometry']]
-    gdf = gdf[gdf['highway'].isin(highway_class_list)]
     gdf_in = gpd.clip(gdf, raster_bbox)
-    gdf_poly_in = gpd.clip(gdf_poly, raster_bbox)
     # Extraire tous les points (sommets) des géométries
     points = []
 
-    for geom in gdf_in.geometry:
-        if geom.geom_type == "LineString":
-            points.extend([Point(xy) for xy in geom.coords])
-
-        elif geom.geom_type == "MultiLineString":
-            for line in geom.geoms:
-                points.extend([Point(xy) for xy in line.coords])
-
     mask = np.zeros((height, width, 3), dtype=np.uint8)
     mask = road_masking(gdf_in, mask)
-    mask = road_polygon_masking(gdf_poly, mask)
-    mask = building_polygon_masking(gdf_poly, mask)
-    mask = water_polygon_masking(gdf_poly, mask)
-    gdf_points = gpd.GeoDataFrame(geometry=points, crs=raster_crs)
+    mask = road_polygon_masking(gdf_in, mask)
+    mask = building_polygon_masking(gdf_in, mask)
+    mask = water_polygon_masking(gdf_in, mask)
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 6.5))
 
@@ -158,12 +163,6 @@ if __name__ == "__main__":
         mask,
         alpha=0.5,
         extent=(bounds.left, bounds.right, bounds.bottom, bounds.top)
-    )
-
-    gdf_in.plot(
-        ax=axes[2],
-        color="red",
-        linewidth=1
     )
 
     axes[2].set_title("Overlay")

@@ -1,7 +1,8 @@
 import overpy
 from pyproj import Transformer
 import geopandas as gpd
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Polygon, MultiPolygon
+from shapely.ops import unary_union, polygonize
 from shapely.validation import make_valid
 base_data_path = r"./data/"
 
@@ -14,6 +15,7 @@ def overpass_query(crs, bounds):
     query = query.replace("BOUNDS", f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}")
     print(query)
     result = api.query(query)
+
     return overpy_to_gdf(result)
 
 
@@ -31,75 +33,78 @@ def convert_crs(source_crs, bounds):
 
 def overpy_to_gdf(result):
 
-    ways = []
-    polygons = []
-
-    def extract_tags(osm_obj):
-
-        tags = osm_obj.tags
-
-        return {
-            "osm_id": osm_obj.id,
-            "highway": tags.get("highway"),
-            "amenity": tags.get("amenity"),
-            "natural": tags.get("natural"),
-            "building": tags.get("building"),
-            "landuse": tags.get("landuse"),
-            "name": tags.get("name"),
-        }
-
-    # -------- Ways --------
-
+    geometries = []
+    attributes = []
+    way_index = {way.id: way for way in result.ways}
     for way in result.ways:
-
-        coords = [(float(n.lon), float(n.lat)) for n in way.nodes]
-
-        if len(coords) < 2:
+        coords = [(float(node.lon), float(node.lat)) for node in way.nodes]
+        if coords[0] == coords[-1] and len(coords) > 2:
+            # Closed way, likely a Polygon
+            geometry = Polygon(coords)
+            type = 'polygon'
+        elif len(coords) > 1:
+            # LineString
+            geometry = LineString(coords)
+            type = 'linestring'
+        else:
             continue
 
-        data = extract_tags(way)
+        geometries.append(geometry)
+        # Store relevant attributes (tags, id, etc.)
+        attributes.append({
+            'id': way.id,
+            'name': way.tags.get('name', None),
+            'highway': way.tags.get('highway', None),
+            'amenity': way.tags.get('amenity', None),
+            'building': way.tags.get('building', None),
+            'natural': way.tags.get('natural', None),
+            'type': type
+        })
+    for relation in result.relations:
+        outer_lines = []
 
-        if coords[0] == coords[-1] and len(coords) >= 4:
+        for member in relation.members:
+            if not isinstance(member, overpy.RelationWay):
+                continue
+            if member.role != "outer":
+                continue
 
-            data["geometry"] = Polygon(coords)
-            polygons.append(data)
+            way = way_index.get(member.ref)
+            if way is None or not way.nodes:
+                continue
 
-        else:
+            coords = [(float(n.lon), float(n.lat)) for n in way.nodes]
+            if len(coords) >= 2:
+                outer_lines.append(LineString(coords))
 
-            data["geometry"] = LineString(coords)
-            ways.append(data)
+        if not outer_lines:
+            continue
 
+        try:
+            # unary_union soude les segments, polygonize referme les anneaux
+            merged = unary_union(outer_lines)
+            polys = list(polygonize(merged))
 
-    # -------- Relations (CRITIQUE) --------
+            if not polys:
+                continue
 
-    for rel in result.relations:
+            geometry = make_valid(unary_union(polys))
 
-        data = extract_tags(rel)
+            geometries.append(geometry)
+            attributes.append({
+                "id": relation.id,
+                "name": relation.tags.get("name"),
+                "highway": relation.tags.get("highway"),
+                "amenity": relation.tags.get("amenity"),
+                "building": relation.tags.get("building"),
+                "natural": relation.tags.get("natural"),
+                "type": "polygon",
+            })
 
-        outer = []
-
-        for member in rel.members:
-
-            if member.role == "outer":
-
-                way = member.resolve()
-
-                coords = [(float(n.lon), float(n.lat)) for n in way.nodes]
-
-                if len(coords) >= 4:
-
-                    outer.append(coords)
-
-        if outer:
-
-            data["geometry"] = Polygon(outer[0])
-
-            polygons.append(data)
-
-
-    gdf_ways = gpd.GeoDataFrame(ways, crs="EPSG:4326")
-
-    gdf_polygons = gpd.GeoDataFrame(polygons, crs="EPSG:4326")
+        except Exception as e:
+            print(f"  ✗ Relation {relation.id} ignorée : {e}")
+    # 3. Create a GeoDataFrame
+    gdf = gpd.GeoDataFrame(attributes, geometry=geometries, crs="EPSG:4326")
 
 
-    return gdf_ways, gdf_polygons
+    return gdf
