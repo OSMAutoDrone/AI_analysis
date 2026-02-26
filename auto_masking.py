@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from shapely.geometry import box
 from shapely.geometry import Point
 from scipy.ndimage import binary_dilation
+from overpass_router import overpass_query
 import os
 
 def road_masking(gdf, mask):
@@ -76,7 +77,7 @@ def water_polygon_masking(gdf, mask):
     return mask
 
 if __name__ == "__main__":
-    img_name = "testGeoImage04.tif"
+    img_name = "testGeoImage02.tif"
     base_data_path = r"./data/"
     highway_data_map_path = "OSM-class-lists/highway.txt"
 
@@ -96,15 +97,8 @@ if __name__ == "__main__":
 
     data = np.moveaxis(data, 0, -1)
 
-    gdf = gpd.read_file(
-        f"{base_data_path}brompton_all.gpkg",
-        layer="brompton_all_lines"
-    )
 
-    gdf_poly = gpd.read_file(
-        f"{base_data_path}brompton_all.gpkg",
-        layer="brompton_all_multipolygons"
-    )
+    gdf, gdf_poly = overpass_query(raster_crs, bounds)
 
     with open(highway_data_map_path, 'r') as f:
         highway_class_list = f.read().splitlines()
@@ -117,7 +111,7 @@ if __name__ == "__main__":
     gdf_poly = gdf_poly[['osm_id','amenity','natural', 'highway', 'building', 'geometry']]
     gdf = gdf[gdf['highway'].isin(highway_class_list)]
     gdf_in = gpd.clip(gdf, raster_bbox)
-    gdf_poly_in = gdf_poly.clip(gdf_poly, raster_bbox)
+    gdf_poly_in = gpd.clip(gdf_poly, raster_bbox)
     # Extraire tous les points (sommets) des géométries
     points = []
 
@@ -176,7 +170,7 @@ if __name__ == "__main__":
     axes[2].axis("off")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(base_data_path,img_name.replace(".tiff", ".png")))
+    plt.savefig(os.path.join(base_data_path,img_name.replace(".tif", ".png")))
     plt.show()
 
 
