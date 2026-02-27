@@ -4,6 +4,7 @@ import geopandas as gpd
 from shapely.geometry import LineString, Polygon, MultiPolygon
 from shapely.ops import unary_union, polygonize
 from shapely.validation import make_valid
+import time
 base_data_path = r"./data/"
 
 
@@ -13,9 +14,17 @@ def overpass_query(crs, bounds):
         query = query_f.read()
     bbox = convert_crs(crs, bounds)
     query = query.replace("BOUNDS", f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}")
-    print(query)
-    result = api.query(query)
 
+    succes = False
+    while not succes:
+        try:
+            result = api.query(query)
+            succes = True
+        except Exception as e:
+            print("--- SERVER ERROR WHILE QUERYING, RETRY IN 5 SECONDS ---")
+            time.sleep(5)
+
+    print("Succesfull query")
     return overpy_to_gdf(result)
 
 

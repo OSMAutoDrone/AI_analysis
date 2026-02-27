@@ -8,3 +8,4 @@
 *.gpkg-shm
 /.idea/*
 /Semantic-Segmentation-of-Aerial-Imagery/UNet_Model_Output/*
+/data
