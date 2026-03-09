@@ -8,6 +8,7 @@ from scipy.ndimage import binary_dilation
 from overpass_router import overpass_query
 from PIL import Image
 import os
+from tqdm import tqdm
 
 base_data_path = r"./data/"
 highway_data_map_path = "OSM-class-lists/highway.txt"
@@ -123,19 +124,24 @@ def masking_pipeline(img_name):
 
     if gdf.crs != raster_crs or gdf.crs != raster_crs :
         gdf = gdf.to_crs(raster_crs)
+
+    expected_columns = ['id', 'name', 'highway', 'amenity', 'building', 'natural', 'type']
     gdf_in = gpd.clip(gdf, raster_bbox)
+    for col in expected_columns:
+        if col not in gdf_in.columns:
+            gdf_in[col] = None
 
     mask = np.zeros((height, width, 3), dtype=np.uint8)
+    mask = water_polygon_masking(gdf_in, mask, height, width, transform)
     mask = road_masking(gdf_in, mask, highway_class_list, height, width, transform)
     mask = road_polygon_masking(gdf_in, mask, height, width, transform)
     mask = building_polygon_masking(gdf_in, mask, height, width, transform)
-    mask = water_polygon_masking(gdf_in, mask, height, width, transform)
 
     return mask, data, bounds
 
 if __name__ == "__main__":
     for d, p, f in os.walk(os.path.join(base_data_path, 'source')):
-        for img in f:
+        for img in tqdm(f):
             print("Processing: ", img)
             img_path = os.path.join(base_data_path, 'source', img)
             mask, data, bounds = masking_pipeline(img_path)
@@ -189,6 +195,8 @@ if __name__ == "__main__":
             Image.fromarray(mask_uint8).save(
                 os.path.join(base_data_path, "base/mask", img.replace(".tif", ".png"))
             )
+
+            plt.close()
 
 
 
