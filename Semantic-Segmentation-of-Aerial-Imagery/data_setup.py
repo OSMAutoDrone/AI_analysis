@@ -167,7 +167,7 @@ class SemanticSegmentationDataset(torch.utils.data.Dataset):
         # One-hot encoding
         mask = one_hot_encode_masks(mask, 6)
 
-        if self.transform:
+        if self.transform is not None:
             transformed = self.transform(image=image, mask=mask)
             image = transformed["image"]
             mask = transformed["mask"]
@@ -188,7 +188,7 @@ def create_dataloaders(
                                                      mask_dir=os.path.join(output_dir, x, 'masks'), 
                                                      image_names=sorted(os.listdir(os.path.join(output_dir, x, 'imgs'))),
                                                      mask_names=sorted(os.listdir(os.path.join(output_dir, x, 'masks'))),
-                                                     transform=data_augmentation[x]) for x in ['train', 'val', 'test']}
+                                                     transform=data_augmentation[x] if data_augmentation is not None else None) for x in ['train', 'val', 'test']}
     dataloaders = {x: DataLoader(image_datasets[x], 
                                  batch_size=batch_size,
                                  num_workers=num_workers,
