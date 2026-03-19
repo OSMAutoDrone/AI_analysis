@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 # Save the model to the target dir
-def save_model(model: torch.nn.Module, target_dir: str, epoch: int):
+def save_model(model: torch.nn.Module, target_dir: str, name: str):
     """
     Saves a PyTorch model to a target directory.
     """
@@ -19,12 +19,26 @@ def save_model(model: torch.nn.Module, target_dir: str, epoch: int):
     target_dir_path.mkdir(parents=True, exist_ok=True)
 
     # Create model save path
-    check_point_name = f"model_epoch_{epoch}"
+    check_point_name = f"{name}.pth"
     model_save_path = target_dir_path / check_point_name
 
     # Save the model state_dict()
     #print(f"[INFO] Saving model to: {model_save_path}")
     torch.save(obj=model.state_dict(), f=model_save_path)
+
+
+def load_model(model: torch.nn.Module, model_path: str, device: torch.device):
+    """
+    Loads a PyTorch model from a .pth file.
+    """
+    # Charge state dict
+    state_dict = torch.load(model_path, map_location=device)
+
+    model.load_state_dict(state_dict)
+
+    model.eval()
+
+    return model
 
 # Plot the training curve
 def plot_curve(results: dict, epochs: int):
@@ -66,8 +80,9 @@ class CategoricalCrossEntropyLoss(nn.Module):
 
 # Multiclass Dice Loss
 class MultiDiceLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=4):
         super().__init__()
+        self.num_classes = num_classes
     
     def dice_coef(self, y_pred, y_true, smooth=0.0001):
 
@@ -77,7 +92,7 @@ class MultiDiceLoss(nn.Module):
 
         return (2. * intersection + smooth) / (torch.sum(y_true_f) + torch.sum(y_pred_f) + smooth)
 
-    def dice_coef_multiclass(self, y_pred, y_true, numLabels=6, smooth=0.0001):    
+    def dice_coef_multiclass(self, y_pred, y_true, numLabels=4, smooth=0.0001):
         dice=0
 
         for index in range(numLabels):
@@ -91,8 +106,9 @@ class MultiDiceLoss(nn.Module):
 
 # Mean IoU Score
 class MeanIoU(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes=4):
         super().__init__()
+        self.num_classes = num_classes
     
     def IoU_coef(self, y_pred, y_true, smooth=0.0001): 
 
@@ -104,7 +120,7 @@ class MeanIoU(nn.Module):
         
         return (intersection + smooth)/(union + smooth)
 
-    def Mean_IoU(self, y_pred, y_true, numLabels=6, smooth=0.0001):
+    def Mean_IoU(self, y_pred, y_true, numLabels=4, smooth=0.0001):
         IoU_Score=0
 
         for index in range(numLabels):

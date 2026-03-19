@@ -8,6 +8,7 @@ import numpy as np
 import torch.optim as optim
 import segmentation_models_pytorch as smp
 import utils,engine,data_setup,predictions, predict
+import copy
 
 from torch.optim import lr_scheduler
 
@@ -16,17 +17,20 @@ torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 
 # Setup hyperparameters
-NUM_EPOCHS = 30
+NUM_EPOCHS = 12
 BATCH_SIZE = 16
+
+loss = []
+IoUs = []
 
 # Create Patches from the original images
 # patch_size = 224
 # original_dir = '../data/Semantic segmentation dataset'
 # data_setup.create_patches(image_dir=original_dir, patch_size=patch_size, target_dir='../data/Patches')
 
-data_dir = '../data/Patches'
+data_dir = '../data/processed'
 output_dir = "train_split"
-splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
+# splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
 
 # Setup target device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -39,8 +43,8 @@ data_augmentation = data_setup.get_transforms(means=means, stds=stds)
 
 # Create DataLoaders with help from data_setup.py
 dataloaders, dataset_sizes = data_setup.create_dataloaders(
-    output_dir=output_dir, 
-    data_augmentation=data_augmentation, 
+    output_dir=output_dir,
+    data_augmentation=data_augmentation,
     batch_size=BATCH_SIZE
 )
 
@@ -53,7 +57,7 @@ ACTIVATION = 'softmax2d'
 model = smp.Unet(
     encoder_name=ENCODER, 
     encoder_weights=ENCODER_WEIGHTS, 
-    classes=6, 
+    classes=4,
     activation=ACTIVATION,
 )
 
@@ -67,7 +71,7 @@ exp_lr_scheduler_UNet = lr_scheduler.StepLR(optimizer_UNet, step_size=7, gamma=0
 # Trainer
 trainer = engine.Trainer(model=model,
                          dataloaders=dataloaders,
-                         epochs=30,
+                         epochs=NUM_EPOCHS,
                          metric=metric_UNet,
                          criterion=criterion_UNet, 
                          optimizer=optimizer_UNet,
@@ -86,9 +90,6 @@ outputs = predictions.evaluate_model(model=model, dataloaders=dataloaders['val']
 ## Display the predictions
 images, masks = next(iter(dataloaders['test']))
 
-img_np, transform, crs = predict.load_geotiff("../data/testGeoImage02.tif")
-img_tensor = predict.preprocess(img_np)
-img_vis = img_np.transpose(1, 2, 0)
 for idx in range(len(images)):
     original_image = np.transpose(images[idx])
     ground_truth_mask = np.transpose(np.argmax(masks[idx], axis=0, keepdims=True))
