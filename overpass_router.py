@@ -21,8 +21,8 @@ def overpass_query(crs, bounds):
             result = api.query(query)
             succes = True
         except Exception as e:
-            print("--- SERVER ERROR WHILE QUERYING, RETRY IN 5 SECONDS ---")
-            time.sleep(5)
+            print("--- SERVER ERROR WHILE QUERYING, RETRY IN 2 SECONDS ---")
+            time.sleep(2)
 
     print("Succesfull query")
     return overpy_to_gdf(result)

@@ -54,7 +54,7 @@ def plot_curve(results: dict, epochs: int):
     plt.show()
 
 # helper function for image visualization
-def display(**images):
+def display(path, save=False, **images):
     """
     Plot images in one row
     """
@@ -68,6 +68,8 @@ def display(**images):
         # get title from the parameter names
         plt.title(name.replace('_',' ').title(), fontsize=15)
         plt.imshow(image)
+    if save:
+        plt.savefig(f"{path}.png")
     plt.show()
     
 # Categorical Cross Entropy Loss
@@ -104,6 +106,42 @@ class MultiDiceLoss(nn.Module):
         #return self.dice_coef_multiclass(torch.softmax(y_pred, dim=1), y_true)
         return self.dice_coef_multiclass(y_pred, y_true)
 
+def np_to_tensor(img_np):
+    img_np = img_np.astype(np.float32)
+    img_np /= 255.0
+
+    img_tensor = torch.from_numpy(img_np).unsqueeze(0)
+
+    return img_tensor
+
+def rgb_to_class(mask_rgb, color_map):
+    """
+    Convertit un masque RGB en indices de classes.
+    color_map: dict {(R,G,B): class_id}
+    """
+    mask_class = np.zeros(mask_rgb.shape[:2], dtype=np.int64)  # (H, W)
+    for color, class_id in color_map.items():
+        match = np.all(mask_rgb == np.array(color), axis=-1)
+        mask_class[match] = class_id
+    return mask_class
+
+
+
+
+def compute_iou(predicted_mask, ground_truth, device="cpu", num_classes=4):
+    """Convertit les masques en one-hot et réutilise MeanIoU."""
+    ground_truth = torch.tensor(ground_truth).long()  # (H, W)
+
+    # Convertir en one-hot : (H, W) → (1, C, H, W)
+    pred_one_hot = torch.nn.functional.one_hot(predicted_mask.long(), num_classes)  # (H, W, C)
+    pred_one_hot = pred_one_hot.permute(2, 0, 1).unsqueeze(0).float().to(device)  # (1, C, H, W)
+
+    true_one_hot = torch.nn.functional.one_hot(ground_truth, num_classes)  # (H, W, C)
+    true_one_hot = true_one_hot.permute(2, 0, 1).unsqueeze(0).float().to(device)  # (1, C, H, W)
+
+    metric = MeanIoU()
+    return metric(pred_one_hot, true_one_hot).item()
+
 # Mean IoU Score
 class MeanIoU(nn.Module):
     def __init__(self, num_classes=4):
@@ -122,7 +160,7 @@ class MeanIoU(nn.Module):
 
     def Mean_IoU(self, y_pred, y_true, numLabels=4, smooth=0.0001):
         IoU_Score=0
-
+        #TODO test with and without computing the unlabeled class
         for index in range(numLabels):
             IoU_Score += self.IoU_coef(y_true[:,index,:,:], y_pred[:,index,:,:], smooth = 1)
 

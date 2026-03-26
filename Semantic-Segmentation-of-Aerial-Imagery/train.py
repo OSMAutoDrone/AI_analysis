@@ -7,7 +7,7 @@ import splitfolders
 import numpy as np
 import torch.optim as optim
 import segmentation_models_pytorch as smp
-import utils,engine,data_setup,predictions, predict
+import utils,engine,data_setup,predictions, validation
 import copy
 
 from torch.optim import lr_scheduler
@@ -23,17 +23,17 @@ if __name__ == "__main__":
     print("device: ", device)
 
     # Setup hyperparameters
-    NUM_EPOCHS = 12
+    NUM_EPOCHS = 15
     BATCH_SIZE = 16
 
     loss = []
     IoUs = []
 
-    data_dir = '../data/processed'
+    data_dir = '../data/base/processed'
     output_dir = "train_split"
 
     # ---Train/Test split, uncomment if needed---
-    # splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
+    splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
 
     
     # Calculate the means and stds of the dataset
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     model = model.to(device)
     metric_UNet = utils.MeanIoU()
     criterion_UNet = utils.MultiDiceLoss()
-    optimizer_UNet = optim.Adam(model.parameters(), lr=0.001)
+    optimizer_UNet = optim.Adam(model.parameters(), lr=0.0005)
     exp_lr_scheduler_UNet = lr_scheduler.StepLR(optimizer_UNet, step_size=7, gamma=0.1)
 
     # Trainer
@@ -80,8 +80,10 @@ if __name__ == "__main__":
                              save_dir="UNet_Model_Output",
                              device=device)
     print("Starting training...")
+
     ## Training process
     model_results = trainer.train_model()
+    trainer.save_best_model("test_model02")
 
     ## Evaluate the model
     outputs = predictions.evaluate_model(model=model, dataloaders=dataloaders['val'], 
@@ -96,4 +98,4 @@ if __name__ == "__main__":
         ground_truth_mask = np.transpose(np.argmax(masks[idx], axis=0, keepdims=True))
         res = predictions.predict_mask(img=images, model=model, device=device)
         predicted_mask = np.transpose(np.argmax(res[idx].to('cpu'), axis=0, keepdims=True))
-        utils.display(original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)
+        utils.display(path=f"../data/results/test02_{idx}", save=True, original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)

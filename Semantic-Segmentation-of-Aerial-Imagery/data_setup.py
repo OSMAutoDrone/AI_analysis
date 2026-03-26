@@ -74,12 +74,10 @@ def create_patches(image_dir, patch_size, target_dir):
 
 # Mask color codes
 class MaskColorMap(Enum):
-    Unlabelled = (155, 155, 155)
-    Building = (60, 16, 152)
-    Land = (132, 41, 246)
-    Road = (110, 193, 228)
-    Vegetation = (254, 221, 58)
-    Water = (226, 169, 41)
+    Unlabelled = (0, 0, 0)
+    Building = (255, 255, 0)
+    water = (0, 64, 255)
+    Road = (240, 30, 44)
 
 # One-hot encode masks
 def one_hot_encode_masks(masks, num_classes):
@@ -179,20 +177,21 @@ class SemanticSegmentationDataset(torch.utils.data.Dataset):
         return image, mask
 
 def create_dataloaders(
-    output_dir: str, 
-    data_augmentation: dict, 
+    output_dir: str,
+    data_augmentation: dict,
     batch_size: int, 
     num_workers: int=NUM_WORKERS
 ):
-    image_datasets = {x: SemanticSegmentationDataset(image_dir=os.path.join(output_dir, x, 'imgs'),
-                                                     mask_dir=os.path.join(output_dir, x, 'masks'), 
-                                                     image_names=sorted(os.listdir(os.path.join(output_dir, x, 'imgs'))),
-                                                     mask_names=sorted(os.listdir(os.path.join(output_dir, x, 'masks'))),
+    image_datasets = {x: SemanticSegmentationDataset(image_dir=os.path.join(output_dir, x, 'img'),
+                                                     mask_dir=os.path.join(output_dir, x, 'mask'),
+                                                     image_names=sorted(os.listdir(os.path.join(output_dir, x, 'img'))),
+                                                     mask_names=sorted(os.listdir(os.path.join(output_dir, x, 'mask'))),
                                                      transform=data_augmentation[x] if data_augmentation is not None else None) for x in ['train', 'val', 'test']}
     dataloaders = {x: DataLoader(image_datasets[x], 
                                  batch_size=batch_size,
                                  num_workers=num_workers,
-                                 shuffle=True, 
+                                 shuffle=True,
+                                 pin_memory=True,
                                  drop_last=True) for x in ['train', 'val', 'test']}
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val', 'test']}
 

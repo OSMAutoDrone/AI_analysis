@@ -11,7 +11,7 @@ import os
 from tqdm import tqdm
 
 base_data_path = r"./data/"
-highway_data_map_path = "OSM-class-lists/highway.txt"
+highway_data_map_path = "./OSM-class-lists/highway.txt"
 
 def road_masking(input_gdf, input_mask, highway_class_list, h, w, t):
     output_mask = input_mask.copy()

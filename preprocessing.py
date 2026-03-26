@@ -16,7 +16,7 @@ mask_output_path = os.path.join(base_path, "processed/mask")
 
 TARGET_RATIO     = (4, 3)       # largeur : hauteur
 TARGET_SIZE      = (640, 480)   # (width, height) après resize
-N_AUGMENTATIONS  = 5            # nb de variantes augmentées par image
+N_AUGMENTATIONS  = 0          # nb de variantes augmentées par image
 
 # ------------------------------------------------------------------ #
 #  PIPELINE ALBUMENTATIONS                                             #
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     os.makedirs(img_output_path,  exist_ok=True)
     os.makedirs(mask_output_path, exist_ok=True)
 
-    files = [f for f in os.listdir(img_input_path) if f.endswith(".jpg")]
+    files = [f for f in os.listdir(img_input_path) if (f.endswith(".jpg") or f.endswith(".png"))]
     print(f"{len(files)} images trouvées, {N_AUGMENTATIONS} augmentations chacune "
           f"→ {len(files) * (N_AUGMENTATIONS + 1)} paires en sortie.")
 

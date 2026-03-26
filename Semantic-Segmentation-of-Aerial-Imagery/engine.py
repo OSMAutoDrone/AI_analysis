@@ -1,13 +1,14 @@
 """
 Contains functions for training and testing a PyTorch model.
 """
-
+import shutil
 import torch
 import time
 import utils
 import numpy as np
-
+import copy
 from tqdm import trange
+import os
 
 class Trainer:
     def __init__(self, 
@@ -19,9 +20,13 @@ class Trainer:
                  optimizer: torch.optim.Optimizer,
                  scheduler: torch.optim.lr_scheduler,
                  save_dir: str,
-                 device: torch.device):
-        
+                 device: torch.device,
+                 save_checkpoint = False):
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         self.model = model
+        self.checkpoint = save_checkpoint
         self.train_dataloader = dataloaders['train']
         self.val_dataloader = dataloaders['val']
         self.epoch = 0
@@ -32,6 +37,8 @@ class Trainer:
         self.scheduler = scheduler
         self.save_dir = save_dir
         self.device = device
+        self.weights = []
+        self.IoUs = []
 
         # Create empty results dictionary
         self.results = {"train_loss": [],
@@ -57,10 +64,11 @@ class Trainer:
             # Validation block
             self.val_epoch()
             print(f'\nEpoch {self.epoch}: Train loss: {self.results["train_loss"][-1]} Train iou: {self.results["train_iou"][-1]} Val loss: {self.results["val_loss"][-1]} Val iou: {self.results["val_iou"][-1]}')
-
+            self.weights.append(copy.deepcopy(self.model.state_dict()))
+            self.IoUs.append(self.results["val_iou"][-1])
             # Save checkpoints every 5 epoch
-            if self.epoch % 5 == 0:
-                utils.save_model(self.model, self.save_dir, self.epoch)
+            if self.epoch % 5 == 0 and self.checkpoint == True:
+                utils.save_model(self.model, self.save_dir, f"checkpoint_{self.epoch}")
 
         time_elapsed = time.time() - start_time
         print('\n')
@@ -132,3 +140,9 @@ class Trainer:
 
         self.results["val_loss"].append(np.mean(running_losses))
         self.results["val_iou"].append(np.mean(running_ious))
+
+
+    def save_best_model(self, name):
+        index = np.argmax(self.IoUs)
+        self.model.load_state_dict(self.weights[index])
+        utils.save_model(self.model, self.save_dir, name)
