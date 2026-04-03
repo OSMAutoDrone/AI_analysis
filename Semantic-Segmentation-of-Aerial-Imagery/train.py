@@ -23,7 +23,7 @@ if __name__ == "__main__":
     print("device: ", device)
 
     # Setup hyperparameters
-    NUM_EPOCHS = 15
+    NUM_EPOCHS = 20
     BATCH_SIZE = 16
 
     loss = []
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     output_dir = "train_split"
 
     # ---Train/Test split, uncomment if needed---
-    splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
+    # splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
 
     
     # Calculate the means and stds of the dataset
@@ -69,6 +69,11 @@ if __name__ == "__main__":
     optimizer_UNet = optim.Adam(model.parameters(), lr=0.0005)
     exp_lr_scheduler_UNet = lr_scheduler.StepLR(optimizer_UNet, step_size=7, gamma=0.1)
 
+    checkpoint = torch.load("UNet_Model_Output/checkpoint/checkpoint_14.pth", map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer_UNet.load_state_dict(checkpoint['optimizer_state_dict'])
+    exp_lr_scheduler_UNet.load_state_dict(checkpoint['scheduler_state_dict'])
+
     # Trainer
     trainer = engine.Trainer(model=model,
                              dataloaders=dataloaders,
@@ -78,12 +83,13 @@ if __name__ == "__main__":
                              optimizer=optimizer_UNet,
                              scheduler=exp_lr_scheduler_UNet,
                              save_dir="UNet_Model_Output",
-                             device=device)
+                             device=device,
+                             save_checkpoint=True)
     print("Starting training...")
 
     ## Training process
     model_results = trainer.train_model()
-    trainer.save_best_model("test_model02")
+    trainer.save_best_model("model_full_v02")
 
     ## Evaluate the model
     outputs = predictions.evaluate_model(model=model, dataloaders=dataloaders['val'], 
@@ -92,10 +98,13 @@ if __name__ == "__main__":
 
     ## Display the predictions
     images, masks = next(iter(dataloaders['test']))
-
+    i = 0
     for idx in range(len(images)):
+        if i >= 10:
+            break
+        i = i+1
         original_image = np.transpose(images[idx])
         ground_truth_mask = np.transpose(np.argmax(masks[idx], axis=0, keepdims=True))
         res = predictions.predict_mask(img=images, model=model, device=device)
         predicted_mask = np.transpose(np.argmax(res[idx].to('cpu'), axis=0, keepdims=True))
-        utils.display(path=f"../data/results/test02_{idx}", save=True, original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)
+        utils.display(path=f"../data/results/full_part02_{idx}", save=True, original_image=original_image, ground_truth_mask=ground_truth_mask, predicted_mask=predicted_mask)

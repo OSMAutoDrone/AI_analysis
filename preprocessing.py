@@ -8,11 +8,11 @@ from PIL import Image
 # ------------------------------------------------------------------ #
 #  CONFIGURATION                                                       #
 # ------------------------------------------------------------------ #
-base_path        = r"./data/base/"
+base_path        = r"./data/base"
 img_input_path   = os.path.join(base_path, "img")
 mask_input_path  = os.path.join(base_path, "mask")
-img_output_path  = os.path.join(base_path, "processed/img")
-mask_output_path = os.path.join(base_path, "processed/mask")
+img_output_path  = os.path.join(base_path, "../processed/img")
+mask_output_path = os.path.join(base_path, "../processed/mask")
 
 TARGET_RATIO     = (4, 3)       # largeur : hauteur
 TARGET_SIZE      = (640, 480)   # (width, height) après resize

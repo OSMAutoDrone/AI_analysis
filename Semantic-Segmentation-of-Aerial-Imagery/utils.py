@@ -26,6 +26,13 @@ def save_model(model: torch.nn.Module, target_dir: str, name: str):
     #print(f"[INFO] Saving model to: {model_save_path}")
     torch.save(obj=model.state_dict(), f=model_save_path)
 
+def save_checkpoint(model, optimizer, scheduler, target_dir, name):
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict(),
+    }, f"{target_dir}/{name}.pth")
+
 
 def load_model(model: torch.nn.Module, model_path: str, device: torch.device):
     """
@@ -54,7 +61,7 @@ def plot_curve(results: dict, epochs: int):
     plt.show()
 
 # helper function for image visualization
-def display(path, save=False, **images):
+def display(name=None, path=None, save=False, **images):
     """
     Plot images in one row
     """
@@ -70,6 +77,8 @@ def display(path, save=False, **images):
         plt.imshow(image)
     if save:
         plt.savefig(f"{path}.png")
+    if name:
+        plt.title(name)
     plt.show()
     
 # Categorical Cross Entropy Loss
@@ -94,16 +103,15 @@ class MultiDiceLoss(nn.Module):
 
         return (2. * intersection + smooth) / (torch.sum(y_true_f) + torch.sum(y_pred_f) + smooth)
 
-    def dice_coef_multiclass(self, y_pred, y_true, numLabels=4, smooth=0.0001):
+    def dice_coef_multiclass(self, y_pred, y_true, smooth=0.0001):
         dice=0
 
-        for index in range(numLabels):
+        for index in range(1, self.num_classes):
             dice += self.dice_coef(y_true[:,index,:,:], y_pred[:,index,:,:], smooth = 0.0001)
 
-        return 1 - dice/numLabels
+        return 1 - dice/(self.num_classes-1)
 
     def forward(self, y_pred, y_true):
-        #return self.dice_coef_multiclass(torch.softmax(y_pred, dim=1), y_true)
         return self.dice_coef_multiclass(y_pred, y_true)
 
 def np_to_tensor(img_np):
@@ -158,13 +166,12 @@ class MeanIoU(nn.Module):
         
         return (intersection + smooth)/(union + smooth)
 
-    def Mean_IoU(self, y_pred, y_true, numLabels=4, smooth=0.0001):
+    def Mean_IoU(self, y_pred, y_true, smooth=0.0001):
         IoU_Score=0
-        #TODO test with and without computing the unlabeled class
-        for index in range(numLabels):
+        for index in range(1, self.num_classes):
             IoU_Score += self.IoU_coef(y_true[:,index,:,:], y_pred[:,index,:,:], smooth = 1)
 
-        return IoU_Score/numLabels
+        return IoU_Score/(self.num_classes-1)
 
     def forward(self, y_pred, y_true):
         #return self.Mean_IoU(torch.softmax(y_pred, dim=1), y_true)

@@ -67,9 +67,10 @@ class Trainer:
             self.weights.append(copy.deepcopy(self.model.state_dict()))
             self.IoUs.append(self.results["val_iou"][-1])
             # Save checkpoints every 5 epoch
-            if self.epoch % 5 == 0 and self.checkpoint == True:
-                utils.save_model(self.model, self.save_dir, f"checkpoint_{self.epoch}")
-
+            if (self.epoch % 8 == 0) and self.checkpoint == True:
+                utils.save_checkpoint(self.model, self.optimizer, self.scheduler, os.path.join(self.save_dir, "checkpoint"), f"checkpoint_{self.epoch}")
+        utils.save_checkpoint(self.model, self.optimizer, self.scheduler, os.path.join(self.save_dir, "checkpoint"),
+                              f"checkpoint_{self.epoch}")
         time_elapsed = time.time() - start_time
         print('\n')
         print('-' * 20)
