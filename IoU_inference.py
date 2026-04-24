@@ -1,13 +1,13 @@
 import segmentation_models_pytorch as smp
-import utils
 import torch
 import numpy as np
 import rasterio
-import predictions
 from auto_masking import masking_pipeline
-from data_setup import MaskColorMap
 import os
 from tqdm import tqdm
+from training import utils, predictions
+from training.data_setup import MaskColorMap
+from PIL import Image
 
 
 def compute_IoU(img_path):
@@ -28,7 +28,7 @@ def compute_IoU(img_path):
     return iou, predicted_mask, osm_mask
 
 
-def load_model(model_path = './UNet_Model_Output/test_model02.pth'):
+def load_model(model_path = 'training/UNet_Model_Output/model_full_v02.pth'):
     ENCODER = 'efficientnet-b4'
     ENCODER_WEIGHTS = 'imagenet'
     ACTIVATION = 'softmax2d'
@@ -49,28 +49,71 @@ if __name__ == '__main__':
     ious_bad = []
     img_good = []
     img_bad = []
+    path_good = []
+    path_bad = []
+    threshold = 0.49
+    fp = 0
+    fn = 0
+    tp = 0
+    tn = 0
     for r, d, f in os.walk(base_path):
+        f = np.array(f)
+        idx = np.random.choice(f.shape[0], 200, replace=False)
+        files = f[idx]
         for file in tqdm(f):
+            qual = "good"
             iou, predicted_mask, osm_mask = compute_IoU(os.path.join(r, file))
-            print(f"iou: {iou:.4f}")
             if os.path.exists(os.path.join(base_path.replace("source_OSM", "base/osm/img"), file.replace(".tif", ".jpg"))):
                 ious_good.append(iou)
                 img_good.append([predicted_mask, osm_mask])
+                path_good.append(os.path.join(r, file))
+                #if iou <= threshold:
+                #    utils.display(name=f"good: {iou}",image=np.array(Image.open(os.path.join(r, file))) ,mask=osm_mask, predicted_mask=predicted_mask)
+                #    fn =fn+1
+                #else:
+                #    tp = tp+1
             else:
                 ious_bad.append(iou)
                 img_bad.append([predicted_mask, osm_mask])
+                path_bad.append(os.path.join(r, file))
+                qual = "bad"
+                #if iou > threshold:
+                #    utils.display(name=f"bad: {iou}",image=np.array(Image.open(os.path.join(r, file))) ,mask=osm_mask, predicted_mask=predicted_mask)
+                #    fp = fp+1
+                #else:
+                #    tn = tn+1
+            print(f"{qual} iou: {iou:.4f}")
+    ious_good = np.array(ious_good)
+    ious_bad = np.array(ious_bad)
+
+    avg_good = np.mean(ious_good)
+    avg_bad = np.mean(ious_bad)
+    print(f"Average good Ious: {avg_good}, covariance: {np.cov(ious_good)}")
+    print(f"Average bad Ious: {avg_bad}, covariance: {np.cov(ious_bad)}")
+    threshold = (avg_good+avg_bad)/2
+    print(f"Threshold: {threshold}")
+    for iou in ious_good:
+        if iou <= threshold:
+            fn =fn+1
+        else:
+            tp = tp+1
+    for iou in ious_bad:
+        if iou <= threshold:
+            tn = tn+1
+        else:
+            fp = fp+1
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1 = 2 * precision * recall / (precision + recall)
+    print(f"fp: {fp}, fn: {fn}, tp: {tp}, tn: {tn}")
+    print(f"precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}")
 
             # utils.display(mask=osm_mask, predicted_mask=predicted_mask)
-    ious_good = np.array(ious_good)
-    # img_good = np.array(img_good)
-    print(f"Average good Ious: {np.mean(ious_good)}, covariance: {np.cov(ious_good)}")
-    ious_bad = np.array(ious_bad)
-    # img_bad = np.array(img_bad)
-    print(f"Average bad Ious: {np.mean(ious_bad)}, covariance: {np.cov(ious_bad)}")
+
     bests_idx = np.argpartition(ious_good, -5)[-5:]
     worst_idx = np.argpartition(ious_bad, 5)[:5]
     for idx in bests_idx:
-        utils.display(mask=img_good[idx][1], predicted_mask=img_good[idx][0], name=f"bests: {ious_good[idx]:.4f}")
+        utils.display(name=f"bests: {ious_good[idx]:.4f}",image=np.array(Image.open(path_good[idx])), mask=img_good[idx][1], predicted_mask=img_good[idx][0])
     for idx in worst_idx:
-        utils.display(mask=img_bad[idx][1], predicted_mask=img_bad[idx][0], name=f"worsts: {ious_bad[idx]:.4f}")
+        utils.display(name=f"worsts: {ious_bad[idx]:.4f}",image=np.array(Image.open(path_bad[idx])), mask=img_bad[idx][1], predicted_mask=img_bad[idx][0])
 

@@ -58,6 +58,7 @@ def plot_curve(results: dict, epochs: int):
     plt.plot(np.arange(epochs, step=1), val_ious, label='Val IoU')
     plt.xlabel('Epoch')
     plt.legend(loc='upper right')
+    plt.savefig("training_curve.png")
     plt.show()
 
 # helper function for image visualization
@@ -68,6 +69,8 @@ def display(name=None, path=None, save=False, **images):
     # clear_output(wait=True)
     num_images = len(images)
     plt.figure(figsize=(12,12))
+    if name is not None:
+        plt.title(name)
     for idx, (name, image) in enumerate(images.items()):
         plt.subplot(1, num_images, idx + 1)
         plt.xticks([]); 
@@ -77,8 +80,7 @@ def display(name=None, path=None, save=False, **images):
         plt.imshow(image)
     if save:
         plt.savefig(f"{path}.png")
-    if name:
-        plt.title(name)
+
     plt.show()
     
 # Categorical Cross Entropy Loss

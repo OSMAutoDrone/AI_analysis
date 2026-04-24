@@ -23,14 +23,14 @@ if __name__ == "__main__":
     print("device: ", device)
 
     # Setup hyperparameters
-    NUM_EPOCHS = 20
+    NUM_EPOCHS = 5
     BATCH_SIZE = 16
 
     loss = []
     IoUs = []
 
-    data_dir = '../data/base/processed'
-    output_dir = "train_split"
+    data_dir = '../data/processed'
+    output_dir = "train_split/osm_only"
 
     # ---Train/Test split, uncomment if needed---
     # splitfolders.ratio(data_dir, output=output_dir, ratio=(0.8, 0.1, 0.1))
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     optimizer_UNet = optim.Adam(model.parameters(), lr=0.0005)
     exp_lr_scheduler_UNet = lr_scheduler.StepLR(optimizer_UNet, step_size=7, gamma=0.1)
 
-    checkpoint = torch.load("UNet_Model_Output/checkpoint/checkpoint_14.pth", map_location=device)
+    checkpoint = torch.load("UNet_Model_Output/checkpoint/final_checkpoint_16.pth", map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer_UNet.load_state_dict(checkpoint['optimizer_state_dict'])
     exp_lr_scheduler_UNet.load_state_dict(checkpoint['scheduler_state_dict'])

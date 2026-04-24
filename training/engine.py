@@ -70,7 +70,7 @@ class Trainer:
             if (self.epoch % 8 == 0) and self.checkpoint == True:
                 utils.save_checkpoint(self.model, self.optimizer, self.scheduler, os.path.join(self.save_dir, "checkpoint"), f"checkpoint_{self.epoch}")
         utils.save_checkpoint(self.model, self.optimizer, self.scheduler, os.path.join(self.save_dir, "checkpoint"),
-                              f"checkpoint_{self.epoch}")
+                              f"final_checkpoint_{self.epoch}")
         time_elapsed = time.time() - start_time
         print('\n')
         print('-' * 20)
