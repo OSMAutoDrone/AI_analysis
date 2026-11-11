@@ -1,21 +1,22 @@
 import segmentation_models_pytorch as smp
 import torch
 import numpy as np
-import rasterio
-from auto_masking import masking_pipeline
+from auto_masking import masking_pipeline, osm_masking
+from rasterio.crs import CRS
+from rasterio.transform import from_bounds
+from preprocessing import TARGET_SIZE
 import os
 from tqdm import tqdm
 from training import utils, predictions
 from training.data_setup import MaskColorMap
 from PIL import Image
+import cv2
+import mercantile
 
 
-def compute_IoU(img_path):
-    osm_mask, _, _ = masking_pipeline(img_path)
+def compute_IoU(img_path, target_size=TARGET_SIZE):
+    osm_mask, data, _ = masking_pipeline(img_path, target_size)  # data: (H, W, C)
     model = load_model()
-    with rasterio.open(img_path) as src:
-        data = src.read()  # (C, H, W)
-        data = np.moveaxis(data, 0, -1)  # (H, W, C)
 
     img_tensor = utils.np_to_tensor(data.transpose(2, 0, 1))  # (1, C, H, W)
     res = predictions.predict_mask(img_tensor, model, "cpu")  # (1, C, H, W)
@@ -43,7 +44,7 @@ def load_model(model_path = 'training/UNet_Model_Output/model_full_v02.pth'):
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     return model
 
-if __name__ == '__main__':
+def Iou_test():
     base_path = "data/source_OSM"
     ious_good = []
     ious_bad = []
@@ -116,4 +117,28 @@ if __name__ == '__main__':
         utils.display(name=f"bests: {ious_good[idx]:.4f}",image=np.array(Image.open(path_good[idx])), mask=img_good[idx][1], predicted_mask=img_good[idx][0])
     for idx in worst_idx:
         utils.display(name=f"worsts: {ious_bad[idx]:.4f}",image=np.array(Image.open(path_bad[idx])), mask=img_bad[idx][1], predicted_mask=img_bad[idx][0])
+
+if __name__ == '__main__':
+    model = load_model()
+    z, x, y = 18, 78662, 93813
+    img_path = f"data/flight_test_data/{z}/{x}/{y}.png"
+
+    img = np.array(Image.open(img_path).convert("RGB"))
+    height, width = img.shape[:2]
+
+    # XYZ tile -> bounds in EPSG:3857 (web mercator, same CRS as the training tifs)
+    tile_bounds = mercantile.xy_bounds(x, y, z)
+    bounds = (tile_bounds.left, tile_bounds.bottom, tile_bounds.right, tile_bounds.top)
+    transform = from_bounds(*bounds, width, height)
+    print(f"Tile {z}/{x}/{y} bounds (EPSG:3857): {bounds}")
+
+    osm_mask = osm_masking(bounds, CRS.from_epsg(3857), transform, height, width)
+
+    img_tensor = utils.np_to_tensor(img.transpose(2, 0, 1))
+    res = predictions.predict_mask(img_tensor, model, "cpu")
+    predicted_mask = torch.argmax(res[0], dim=0)
+
+    color_map = {color.value: idx for idx, color in enumerate(MaskColorMap)}
+    iou = utils.compute_iou(predicted_mask, utils.rgb_to_class(osm_mask, color_map), "cpu", num_classes=4)
+    utils.display(name=f"{z}/{x}/{y} IoU: {iou:.4f}", image=img, osm_mask=osm_mask, predicted_mask=predicted_mask)
 

@@ -1,0 +1,20 @@
+[general]
+name=OSM Segmentation IoU
+qgisMinimumVersion=3.34
+description=Compares a U-Net segmentation of an orthophoto with OpenStreetMap and maps the IoU per tile
+version=0.1
+author=DannickB
+email=ti-dan98@hotmail.com
+
+about=Runs a segmentation model (buildings, water, roads) on an orthophoto exported as Z/X/Y tiles, rasterizes the OSM features of the same area, and computes the IoU of each tile. Outputs an IoU heatmap, the segmentation raster and the OSM mask raster. Requires the Python packages onnxruntime, rasterio, overpy and mercantile in QGIS's Python (see README.md).
+
+tracker=http://bugs
+repository=http://repo
+
+hasProcessingProvider=no
+tags=python,segmentation,openstreetmap,orthophoto,iou
+category=Plugins
+icon=icon.png
+experimental=True
+deprecated=False
+server=False

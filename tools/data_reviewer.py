@@ -9,6 +9,7 @@ viz_path = os.path.join(base_path, 'base/viz')
 discarded_path = os.path.join(base_path, 'base/discarted')
 img_path = os.path.join(base_path, 'base/img')
 mask_path = os.path.join(base_path, 'base/mask')
+
 if __name__ == '__main__':
     plt.rcParams['figure.figsize'] = [16, 8]
     if not os.path.exists(discarded_path):

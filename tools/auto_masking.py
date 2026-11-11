@@ -2,16 +2,18 @@ import geopandas as gpd
 import rasterio
 from rasterio.features import rasterize
 import numpy as np
-import matplotlib.pyplot as plt
 from shapely.geometry import box
 from scipy.ndimage import binary_dilation
 from overpass_router import overpass_query
-from PIL import Image
 import os
-from tqdm import tqdm
+from pathlib import Path
+
+# This module is shared with the QGIS plugin, whose Python has no cv2, albumentations,
+# tqdm or matplotlib: those are imported only inside the functions that need them.
 
 base_data_path = r"./data/"
-highway_data_map_path = "./OSM-class-lists/highway.txt"
+DEFAULT_HIGHWAY_CLASSES_PATH = Path(__file__).resolve().parent.parent / "OSM-class-lists" / "highway.txt"
+OSM_COLUMNS = ['id', 'name', 'highway', 'amenity', 'building', 'natural', 'type']
 
 def road_masking(input_gdf, input_mask, highway_class_list, h, w, t):
     output_mask = input_mask.copy()
@@ -86,6 +88,8 @@ def water_polygon_masking(input_gdf, input_mask, h, w, t):
     return output_mask
 
 def debug_plot(input_data, input_mask, input_bounds, title):
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.imshow(
         input_data,
@@ -101,7 +105,14 @@ def debug_plot(input_data, input_mask, input_bounds, title):
     ax.set_title(title)
     ax.axis("off")
 
-def masking_pipeline(img_name):
+def masking_pipeline(img_name, target_size=None):
+    """Builds the OSM mask of a georeferenced image.
+
+    Args:
+        img_name: Path to the georeferenced raster.
+        target_size: Optional (width, height). If set, the image and the mask are
+            resized like in preprocessing.py (bilinear for the image, nearest for the mask).
+    """
     with rasterio.open(img_name) as img:
         bounds = img.bounds
         raster_crs = img.crs
@@ -112,34 +123,92 @@ def masking_pipeline(img_name):
         if abs(transform.a) != abs(transform.e):
             print("WARNING- Image pixel's transformation does not match")
 
-    raster_bbox = box(bounds.left, bounds.bottom, bounds.right, bounds.top)
-
     data = np.moveaxis(data, 0, -1)
 
+    mask = osm_masking(bounds, raster_crs, transform, height, width)
 
-    gdf = overpass_query(raster_crs, bounds)
+    if target_size is not None:
+        from preprocessing import resize_pair
+        data, mask = resize_pair(data, mask, target_size)
 
-    with open(highway_data_map_path, 'r') as f:
-        highway_class_list = f.read().splitlines()
+    return mask, data, bounds
 
-    if gdf.crs != raster_crs or gdf.crs != raster_crs :
+def osm_masking(bounds, raster_crs, transform, height, width):
+    """Downloads the OSM features inside bounds and rasterizes them into an RGB class mask.
+
+    Args:
+        bounds: (left, bottom, right, top) in raster_crs.
+        raster_crs: CRS of bounds and transform.
+        transform: Affine pixel-to-CRS transform of the target grid.
+        height: Mask height in pixels.
+        width: Mask width in pixels.
+    """
+    gdf = fetch_osm_features(bounds, raster_crs)
+    return rasterize_osm_features(gdf, bounds, transform, height, width)
+
+def fetch_osm_features(bounds, raster_crs, query_path=None):
+    """Downloads the OSM features inside bounds from Overpass, reprojected to raster_crs.
+
+    Split from rasterize_osm_features so a large area can be queried once and then
+    rasterized tile by tile.
+
+    Args:
+        bounds: (left, bottom, right, top) in raster_crs.
+        raster_crs: CRS of bounds and of the returned GeoDataFrame.
+        query_path: Optional Overpass QL template; overpass_router's default otherwise.
+    """
+    if query_path is None:
+        gdf = overpass_query(raster_crs, bounds)
+    else:
+        gdf = overpass_query(raster_crs, bounds, query_path=query_path)
+
+    if gdf.crs != raster_crs:
         gdf = gdf.to_crs(raster_crs)
+    return gdf
 
-    expected_columns = ['id', 'name', 'highway', 'amenity', 'building', 'natural', 'type']
+def load_highway_classes(path=DEFAULT_HIGHWAY_CLASSES_PATH):
+    with open(path, 'r') as f:
+        return f.read().splitlines()
+
+def rasterize_osm_features(gdf, bounds, transform, height, width, highway_class_list=None):
+    """Rasterizes OSM features into an RGB class mask (colors of MaskColorMap).
+
+    Args:
+        gdf: Features in the CRS of bounds, with the OSM_COLUMNS attributes
+            ('type' is 'linestring' or 'polygon'). Missing columns are treated as empty.
+        bounds: (left, bottom, right, top) of the mask.
+        transform: Affine pixel-to-CRS transform of the mask.
+        height: Mask height in pixels.
+        width: Mask width in pixels.
+        highway_class_list: highway values drawn as roads; read from highway.txt if None.
+
+    Returns:
+        (height, width, 3) uint8 RGB mask.
+    """
+    if highway_class_list is None:
+        highway_class_list = load_highway_classes()
+
+    raster_bbox = box(bounds[0], bounds[1], bounds[2], bounds[3])
     gdf_in = gpd.clip(gdf, raster_bbox)
-    for col in expected_columns:
+    for col in OSM_COLUMNS:
         if col not in gdf_in.columns:
             gdf_in[col] = None
 
+    # Drawing order matters: later classes overwrite earlier ones (buildings on top).
     mask = np.zeros((height, width, 3), dtype=np.uint8)
     mask = water_polygon_masking(gdf_in, mask, height, width, transform)
     mask = road_masking(gdf_in, mask, highway_class_list, height, width, transform)
     mask = road_polygon_masking(gdf_in, mask, height, width, transform)
     mask = building_polygon_masking(gdf_in, mask, height, width, transform)
 
-    return mask, data, bounds
+    return mask
 
-if __name__ == "__main__":
+def build_dataset():
+    """Builds the training images, masks and visualizations from data/source."""
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    from tqdm import tqdm
+
     for d, p, f in os.walk(os.path.join(base_data_path, 'source')):
         for img in tqdm(f):
             print("Processing: ", img)
@@ -199,5 +268,5 @@ if __name__ == "__main__":
             plt.close()
 
 
-
-
+if __name__ == "__main__":
+    build_dataset()

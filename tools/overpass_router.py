@@ -1,31 +1,79 @@
 import overpy
+import requests
 from pyproj import Transformer
 import geopandas as gpd
 from shapely.geometry import LineString, Polygon, MultiPolygon
 from shapely.ops import unary_union, polygonize
 from shapely.validation import make_valid
 import time
-base_data_path = r"./data/"
+from pathlib import Path
+
+# Resolved from this file so the module works regardless of the working directory.
+DEFAULT_QUERY_PATH = Path(__file__).resolve().parent.parent / "data" / "OSM_request.txt"
+
+# Tried in order; the next one is used when a server fails.
+# overpass-api.de rejected automated requests (HTTP 406/502) in October 2026.
+OVERPASS_URLS = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+]
+MAX_ATTEMPTS = 5
+FIRST_RETRY_DELAY_S = 2
+# Client-side limit per request: without it an overloaded server can hang for minutes.
+# Slightly above the [timeout:40] of OSM_request.txt so the server can answer first.
+REQUEST_TIMEOUT_S = 60
+# Public Overpass servers reject anonymous automated clients.
+USER_AGENT = "Perdoudes-AI-analysis/0.1 (OSM segmentation IoU research)"
 
 
-def overpass_query(crs, bounds):
-    api = overpy.Overpass()
-    with open(f"{base_data_path}OSM_request.txt") as query_f:
+class OverpassQueryRejected(Exception):
+    pass
+
+
+def overpass_query(crs, bounds, query_path=DEFAULT_QUERY_PATH, urls=OVERPASS_URLS):
+    """Downloads the OSM features inside bounds as a GeoDataFrame (EPSG:4326).
+
+    Each attempt cycles to the next server; the delay between attempts doubles.
+
+    Args:
+        crs: CRS of bounds.
+        bounds: (left, bottom, right, top) in crs.
+        query_path: Overpass QL template, where "BOUNDS" is replaced by the bbox.
+        urls: Overpass interpreter endpoints, tried in order.
+
+    Raises:
+        OverpassQueryRejected: If the server rejects the query itself (HTTP 400).
+        RuntimeError: If every attempt failed.
+    """
+    with open(query_path) as query_f:
         query = query_f.read()
     bbox = convert_crs(crs, bounds)
     query = query.replace("BOUNDS", f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}")
 
-    succes = False
-    while not succes:
+    delay = FIRST_RETRY_DELAY_S
+    last_error = None
+    for attempt in range(MAX_ATTEMPTS):
+        url = urls[attempt % len(urls)]
         try:
-            result = api.query(query)
-            succes = True
+            # requests instead of overpy.query: overpy has no timeout nor custom headers.
+            response = requests.post(url, data={"data": query}, timeout=REQUEST_TIMEOUT_S,
+                                     headers={"User-Agent": USER_AGENT})
+            if response.status_code == 400:
+                # Retrying cannot fix a malformed query.
+                raise OverpassQueryRejected(f"Overpass rejected the query: {response.text[:500]}")
+            response.raise_for_status()
+            result = overpy.Overpass().parse_json(response.content)
+            print(f"Successful query ({url})")
+            return overpy_to_gdf(result)
+        except OverpassQueryRejected:
+            raise
         except Exception as e:
-            print("--- SERVER ERROR WHILE QUERYING, RETRY IN 2 SECONDS ---")
-            time.sleep(2)
+            last_error = e
+            print(f"--- Overpass error on {url}: {type(e).__name__}: {e}. Retry in {delay} s ---")
+            time.sleep(delay)
+            delay *= 2
 
-    print("Succesfull query")
-    return overpy_to_gdf(result)
+    raise RuntimeError(f"Overpass query failed after {MAX_ATTEMPTS} attempts: {last_error}")
 
 
 def convert_crs(source_crs, bounds):

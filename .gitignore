@@ -6,7 +6,9 @@
 *.gpkg-wal
 *.json
 *.gpkg-shm
-/.idea/*
-/Semantic-Segmentation-of-Aerial-Imagery
+/training
 /data
 /BiSeNet-master
+/.idea
+/__pycache__
+*.xml

@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OSMSegmentationIoUDialogBase</class>
+ <widget class="QDialog" name="OSMSegmentationIoUDialogBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>520</width>
+    <height>740</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>OSM Segmentation IoU</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="inputGroup">
+     <property name="title">
+      <string>Input</string>
+     </property>
+     <layout class="QFormLayout" name="inputLayout">
+      <item row="0" column="0">
+       <widget class="QRadioButton" name="geotiffRadio">
+        <property name="text">
+         <string>Orthophoto (GeoTIFF)</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <layout class="QHBoxLayout" name="orthophotoLayout">
+        <item>
+         <widget class="QComboBox" name="rasterLayerCombo">
+          <property name="toolTip">
+           <string>Raster layer of the project. Use ... to load a file as a new layer.</string>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="browseOrthophotoButton">
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="tileSizeLabel">
+        <property name="text">
+         <string>    Tile size</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="tileSizeSpin">
+        <property name="toolTip">
+         <string>Width and height of each tile in pixels, at the target resolution (multiple of 32).</string>
+        </property>
+        <property name="suffix">
+         <string> px</string>
+        </property>
+        <property name="minimum">
+         <number>64</number>
+        </property>
+        <property name="maximum">
+         <number>2048</number>
+        </property>
+        <property name="singleStep">
+         <number>32</number>
+        </property>
+        <property name="value">
+         <number>256</number>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QRadioButton" name="xyzRadio">
+        <property name="text">
+         <string>Tile folder (Z/X/Y)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <layout class="QHBoxLayout" name="tileFolderLayout">
+        <item>
+         <widget class="QLineEdit" name="tileFolderInput">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="browseTileFolderButton">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="modelLabel">
+        <property name="text">
+         <string>Model (.onnx)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <layout class="QHBoxLayout" name="modelLayout">
+        <item>
+         <widget class="QLineEdit" name="modelPathInput"/>
+        </item>
+        <item>
+         <widget class="QToolButton" name="browseModelButton">
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="targetResolutionLabel">
+        <property name="text">
+         <string>Target resolution</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QDoubleSpinBox" name="targetResolutionSpin">
+        <property name="toolTip">
+         <string>Ground resolution of the tiles. The orthophoto is resampled to it; for a tile folder, the closest zoom level is used. The model was trained at about 0.5 m/px.</string>
+        </property>
+        <property name="suffix">
+         <string> m/px</string>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="minimum">
+         <double>0.010000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>10.000000000000000</double>
+        </property>
+        <property name="singleStep">
+         <double>0.050000000000000</double>
+        </property>
+        <property name="value">
+         <double>0.500000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="minValidLabel">
+        <property name="text">
+         <string>Minimum valid pixels</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QSpinBox" name="minValidSpin">
+        <property name="toolTip">
+         <string>Tiles with a smaller share of non-transparent pixels are skipped (orthophoto edges).</string>
+        </property>
+        <property name="suffix">
+         <string> %</string>
+        </property>
+        <property name="maximum">
+         <number>100</number>
+        </property>
+        <property name="value">
+         <number>50</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="osmGroup">
+     <property name="title">
+      <string>OSM source</string>
+     </property>
+     <layout class="QVBoxLayout" name="osmLayout">
+      <item>
+       <widget class="QRadioButton" name="overpassRadio">
+        <property name="text">
+         <string>Download from Overpass API</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="vectorLayersRadio">
+        <property name="text">
+         <string>Use loaded vector layers (fields: highway, building, natural, amenity)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="vectorLayersList">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>100</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="outputGroup">
+     <property name="title">
+      <string>Outputs</string>
+     </property>
+     <layout class="QVBoxLayout" name="outputLayout">
+      <item>
+       <widget class="QCheckBox" name="addPredictionCheckbox">
+        <property name="text">
+         <string>Add segmentation layer</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="addOsmCheckbox">
+        <property name="text">
+         <string>Add OSM mask layer</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="exportRastersCheckbox">
+        <property name="text">
+         <string>Export rasters (GeoTIFF)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="exportHeatmapCheckbox">
+        <property name="text">
+         <string>Export IoU heatmap (GeoPackage)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="outputFolderLayout">
+        <item>
+         <widget class="QLabel" name="outputFolderLabel">
+          <property name="text">
+           <string>Export folder</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="outputFolderInput"/>
+        </item>
+        <item>
+         <widget class="QToolButton" name="browseFolderButton">
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonsLayout">
+     <item>
+      <widget class="QPushButton" name="runButton">
+       <property name="text">
+        <string>Run</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="cancelButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Cancel</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="progressBar">
+     <property name="value">
+      <number>0</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="logOutput">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>geotiffRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>rasterLayerCombo</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>geotiffRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>browseOrthophotoButton</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>geotiffRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>tileSizeSpin</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>xyzRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>tileFolderInput</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>xyzRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>browseTileFolderButton</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>vectorLayersRadio</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>vectorLayersList</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+ </connections>
+</ui>
