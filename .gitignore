@@ -1,14 +1,23 @@
 *.png
 *.jpg
 *.gpkg
-*.gpkg
 *.gpkg-shm
 *.gpkg-wal
 *.json
-*.gpkg-shm
+*.xml
+__pycache__/
 /training
-/data
 /BiSeNet-master
 /.idea
-/__pycache__
-*.xml
+
+# Data: ignored, except the Overpass query template used by tools/ and the QGIS plugin.
+/data/*
+!/data/OSM_request.txt
+
+# Models are too large for git (GitHub warns above 50 MB): distribute them separately.
+*.onnx
+*.pth
+
+# QGIS plugin: keep its icon, ignore the ZIP built by qgis_plugin/deploy.py --zip.
+!qgis_plugin/**/icon.png
+/dist

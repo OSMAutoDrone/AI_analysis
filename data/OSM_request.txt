@@ -1,0 +1,17 @@
+[out:json] [timeout:40];
+(
+    node["highway"](BOUNDS);
+    node["building"](BOUNDS);
+    node["amenity"="parking"](BOUNDS);
+    node["natural"="water"](BOUNDS);
+    way["highway"](BOUNDS);
+    way["building"](BOUNDS);
+    way["amenity"="parking"](BOUNDS);
+    way["natural"="water"](BOUNDS);
+    relation["highway"](BOUNDS);
+    relation["building"](BOUNDS);
+    relation["amenity"="parking"](BOUNDS);
+    relation["natural"="water"](BOUNDS);
+);
+(._;>;);
+out geom;

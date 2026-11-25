@@ -1,10 +1,10 @@
 import segmentation_models_pytorch as smp
 import torch
 import numpy as np
-from auto_masking import masking_pipeline, osm_masking
+from tools.auto_masking import masking_pipeline, osm_masking
 from rasterio.crs import CRS
 from rasterio.transform import from_bounds
-from preprocessing import TARGET_SIZE
+from tools.preprocessing import TARGET_SIZE
 import os
 from tqdm import tqdm
 from training import utils, predictions
